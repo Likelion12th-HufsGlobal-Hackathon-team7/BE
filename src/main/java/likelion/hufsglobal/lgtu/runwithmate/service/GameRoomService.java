@@ -49,6 +49,8 @@ public class GameRoomService {
         roomUpdateResDto.setBetPoint(betPoint);
         roomUpdateResDto.setTimeLimit(timeLimit);
         return roomUpdateResDto;
+
+
     }
 
     public RoomJoinResDto joinRoom(String roomId, String userId) {

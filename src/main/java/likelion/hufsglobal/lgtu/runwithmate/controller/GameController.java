@@ -1,9 +1,7 @@
 package likelion.hufsglobal.lgtu.runwithmate.controller;
 
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.UserPosition;
-import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.BoxRemoveResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.PositionUpdateResDto;
-import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.StartCheckReqDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.StartCheckResDto;
 import likelion.hufsglobal.lgtu.runwithmate.service.GameService;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +29,14 @@ public class GameController {
     public PositionUpdateResDto updatePosition(@DestinationVariable String roomId, UserPosition userPosition) {
         // TODO: JWT에서 유저 이름 가져오기, 서비스 연동하기
         String userId = "user1"; // 임시로 유저 이름 지정
-        return new PositionUpdateResDto();
+        return gameService.updatePosition(roomId, userId, userPosition);
     }
+
+    @MessageMapping("/surrender/{roomId}")
+    @SendTo("/room/{roomId}")
+    public void gameSurrender(@DestinationVariable String roomId) {
+
+    }
+
 
 }

@@ -16,8 +16,8 @@ public class GameFinishResDto {
     private String winner;
     private String winnerName;
     private String loserName;
-    private Integer pointP1;
-    private Integer pointP2;
-    private Integer dopamineP1;
-    private Integer dopamineP2;
+    private Long pointP1;
+    private Long pointP2;
+    private Long dopamineP1;
+    private Long dopamineP2;
 }
