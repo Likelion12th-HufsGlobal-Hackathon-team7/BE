@@ -1,9 +1,7 @@
 package likelion.hufsglobal.lgtu.runwithmate.controller;
 
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.UserPosition;
-import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.BoxRemoveResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.PositionUpdateResDto;
-import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.StartCheckReqDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.StartCheckResDto;
 import likelion.hufsglobal.lgtu.runwithmate.service.GameService;
 import lombok.RequiredArgsConstructor;
