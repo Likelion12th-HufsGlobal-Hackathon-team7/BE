@@ -1,22 +1,22 @@
 package likelion.hufsglobal.lgtu.runwithmate.domain.game;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Getter @Setter
 @NoArgsConstructor
-// @Entity
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+@Entity
 public class GameInfo {
-    private String roomUid;
-    private String user1Uid;
-    private String user2Uid;
-    private Long dopamineP1;
-    private Long dopamineP2;
-    private Long pointP1;
-    private Long pointP2;
-    private Long timeLeft;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String roomId;
+    private Long betPoint;
+    @OneToMany(cascade = CascadeType.ALL)
+    private List<GameInfoForUser> usersInfo = new ArrayList<>();
 }
