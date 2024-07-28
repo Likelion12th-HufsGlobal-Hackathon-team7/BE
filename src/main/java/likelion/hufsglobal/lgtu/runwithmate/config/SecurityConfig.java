@@ -1,5 +1,6 @@
 package likelion.hufsglobal.lgtu.runwithmate.config;
 
+import jakarta.servlet.DispatcherType;
 import likelion.hufsglobal.lgtu.runwithmate.service.OAuth2UserService;
 import likelion.hufsglobal.lgtu.runwithmate.utils.CustomSuccessHandler;
 import likelion.hufsglobal.lgtu.runwithmate.utils.JwtFilter;
@@ -11,6 +12,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -49,15 +51,15 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                .addFilterBefore(new JwtFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new JwtFilter(jwtUtil), OAuth2LoginAuthenticationFilter.class)
                 .oauth2Login(oauth2 -> oauth2
-                        .loginPage("/login")
+//                        .loginPage("/login")
                         .userInfoEndpoint(userInfoEndpointConfig -> userInfoEndpointConfig
                                 .userService(oauth2UserService))
                         .successHandler(customSuccessHandler))
 
                 .authorizeHttpRequests( request -> request
-                        .requestMatchers("/", "/oauth2/**", "/login/**").permitAll()
+                        .requestMatchers("/**", "/oauth2/**", "/login/**").permitAll()
                         .anyRequest().authenticated()
                 );
 

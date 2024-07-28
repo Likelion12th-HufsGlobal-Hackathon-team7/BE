@@ -10,6 +10,7 @@ import likelion.hufsglobal.lgtu.runwithmate.domain.game.type.BoxType;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.type.FinishType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,8 +21,9 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class GameService {
-
+    private static final double DISTANCE_THRESHOLD = 0.0001;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public StartCheckResDto checkStart(String roomId, String userId, UserPosition position) {
@@ -115,7 +117,9 @@ public class GameService {
         return positionUpdateResDto;
     }
 
-    public BoxRemoveResDto removeBox(String roomId, String userId) {
+    // -------------------------------------------------
+
+    public void removeBox(String roomId, String userId, UserPosition position) {
         /**
          * 1. `point_boxes:방번호` 와 `dopamine_boxes:방번호` 에 대하여 플레이어가 특정 박스 주변인지 파악
          * 2. `point_boxes:방번호` 와 `dopamine_boxes:방번호` 에 대하여 해당 박스 `"{'id': 'box1', 'lat': 10, 'lng': 20}"`  제거
@@ -124,9 +128,82 @@ public class GameService {
          *  * 3-2. userId : {”point”:10, “dopamine”:20} 형태로 저장되어 있음
          * 4. 제거된 박스 프론트한테 공지
          */
-        return new BoxRemoveResDto();
+
+        BoxRemoveResDto response = new BoxRemoveResDto();
+
+        // 1. 특정 박스 주변인지 파악
+        List<BoxInfo> nearbyBoxes = findNearbyBoxes(roomId, position);
+        if (nearbyBoxes.isEmpty()) {
+            return;
+        }
+
+        removeBoxes(roomId, nearbyBoxes); // 박스 제거
+        incrementPlayerPoints(roomId, userId, nearbyBoxes); // 포인트 상승
+        notifyBoxRemoval(roomId, userId, nearbyBoxes); // 박스 제거 로깅
     }
 
+    private List<BoxInfo> findNearbyBoxes(String roomId, UserPosition position) {
+        List<BoxInfo> nearbyBoxes = new ArrayList<>();
+        List<Object> pointBoxes = redisTemplate.opsForList().range("point_boxes:" + roomId, 0, -1);
+        List<Object> dopamineBoxes = redisTemplate.opsForList().range("dopamine_boxes:" + roomId, 0, -1);
+
+        for (Object obj : pointBoxes) {
+            BoxInfo box = (BoxInfo) obj;
+            if (isNearby(box, position)) {
+                nearbyBoxes.add(box);
+            }
+        }
+
+        for (Object obj : dopamineBoxes) {
+            BoxInfo box = (BoxInfo) obj;
+            if (isNearby(box, position)) {
+                nearbyBoxes.add(box);
+            }
+        }
+
+        return nearbyBoxes;
+    }
+
+    private boolean isNearby(BoxInfo box, UserPosition position) {
+        double distance = Math.sqrt(Math.pow(box.getLat() - position.getLat(), 2) + Math.pow(box.getLng() - position.getLng(), 2));
+        return distance < DISTANCE_THRESHOLD;
+    }
+
+    private void removeBoxes(String roomId, List<BoxInfo> boxes) {
+        for (BoxInfo box : boxes) {
+            if (box.getBoxType() == BoxType.POINT) {
+                redisTemplate.opsForList().remove("point_boxes:" + roomId, 1, box);
+            } else if (box.getBoxType() == BoxType.DOPAMINE) {
+                redisTemplate.opsForList().remove("dopamine_boxes:" + roomId, 1, box);
+            }
+        }
+    }
+
+    private void incrementPlayerPoints(String roomId, String userId, List<BoxInfo> boxes) {
+        String playerPointsKey = "player_points:" + roomId;
+        for (BoxInfo box : boxes) {
+            if (box.getBoxType() == BoxType.POINT) {
+                redisTemplate.opsForHash().increment(playerPointsKey, userId, box.getBoxAmount());
+            } else if (box.getBoxType() == BoxType.DOPAMINE) {
+                redisTemplate.opsForHash().increment(playerPointsKey, userId, box.getBoxAmount());
+            }
+        }
+    }
+
+    private void notifyBoxRemoval(String roomId, String userId, List<BoxInfo> boxes) {
+        for (BoxInfo box : boxes) {
+            // 박스 제거를 공지하는 로직을 여기에 추가 (예: 메시지 큐, 웹소켓 등)
+            BoxRemoveResDto boxRemoveResDto = new BoxRemoveResDto();
+            boxRemoveResDto.setBoxType(box.getBoxType());
+            boxRemoveResDto.setBoxId(box.getId());
+            boxRemoveResDto.setBoxAmount(box.getBoxAmount().intValue());
+            boxRemoveResDto.setUserId(userId);
+
+            messagingTemplate.convertAndSend("/room/" + roomId, boxRemoveResDto);
+        }
+    }
+
+    // -------------------------------------------------
 
     public GameFinishResDto finishGame(String roomId) {
         /**
