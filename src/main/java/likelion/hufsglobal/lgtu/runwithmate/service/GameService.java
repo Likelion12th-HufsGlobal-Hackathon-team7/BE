@@ -1,13 +1,13 @@
 package likelion.hufsglobal.lgtu.runwithmate.service;
 
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.BoxInfo;
+import likelion.hufsglobal.lgtu.runwithmate.domain.game.GameInfo;
+import likelion.hufsglobal.lgtu.runwithmate.domain.game.GameInfoForUser;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.UserPosition;
-import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.BoxRemoveResDto;
-import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.GameFinishResDto;
-import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.PositionUpdateResDto;
-import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.StartCheckResDto;
+import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.*;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.type.BoxType;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.type.FinishType;
+import likelion.hufsglobal.lgtu.runwithmate.repository.GameRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -22,6 +22,7 @@ import java.util.*;
 public class GameService {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final GameRepository gameRepository;
 
     @Transactional
     public StartCheckResDto checkStart(String roomId, String userId, UserPosition position) {
@@ -30,6 +31,11 @@ public class GameService {
         Long userCount = (Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user_entered");
         redisTemplate.opsForHash().increment("game_rooms:" + roomId, "user_entered", 1);
 
+        // 유저 포인트 초기화
+        Map<String, Long> userPoints = new HashMap<>();
+        userPoints.put("point",0L);
+        userPoints.put("dopamine",0L);
+        redisTemplate.opsForHash().put("player_points:" + roomId, userId, userPoints);
         // 유저 위치 저장하기
         redisTemplate.opsForHash().put("player_positions:" + roomId, userId, position);
 
@@ -127,8 +133,8 @@ public class GameService {
         return new BoxRemoveResDto();
     }
 
-
-    public GameFinishResDto finishGame(String roomId) {
+    // 서렌쳤을 때 어떻게 finishGame 불러와서 실행시킬지
+    public GameFinishResDto finishGame(String roomId, FinishType finishType, String surrenderId) {
         /**
          * 1. dopamine이 높은 유저가 승자
          * * 1-1. dopamine이 같다면 호스트가 승자
@@ -136,53 +142,73 @@ public class GameService {
          * 3. redis 데이터 삭제
          * 4. 결과 반환
          */
+        // 서렌쳤을 때 어떻게 finishGame을 실행시
+
         // "player_points:" + roomId, userId : {"point":10, "dopamine":20}
-        String userOneId = "user1"; // 나중에 변경
-        String userTwoId = "user2";
+        String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:"+roomId,"user1_id"); // 나중에 변경
+        String userTwoId = (String) redisTemplate.opsForHash().get("game_rooms:"+roomId,"user2_id");
         // user1 도파민/포인트 빼오기
         Map<String, Long> userOnePoints = (Map<String, Long>) redisTemplate.opsForHash().get("player_points:" + roomId, userOneId);
         Long userOneDopamine = userOnePoints.get("dopamine");
         Long userOnePoint = userOnePoints.get("point");
-
-        if (userOneDopamine == null) {
-            userOneDopamine = 0L;
-        }
 
         // user2 도파민/포인트 빼오기
         Map<String, Long> userTwoPoints = (Map<String, Long>) redisTemplate.opsForHash().get("player_points:" + roomId, userTwoId);
         Long userTwoDopamine = userTwoPoints.get("dopamine");
         Long userTwoPoint = userTwoPoints.get("point");
 
-        if (userTwoDopamine == null) {
-            userTwoDopamine = 0L;
+
+        boolean isUserOneWin = userOneDopamine >= userTwoDopamine;
+        if (finishType.equals(FinishType.PLAYER_SURRENDER)){
+            isUserOneWin = !surrenderId.equals(userOneId);
         }
 
-        if (userOneDopamine >= userTwoDopamine) {
-            GameFinishResDto gameFinishResDto = new GameFinishResDto();
-
-            gameFinishResDto.setFinishType(FinishType.TIME_EXCEED);
-            gameFinishResDto.setWinner("user1"); // user1 아이디 가져와야 함
-            gameFinishResDto.setWinnerName("user1_nickname"); // user1 닉네임 가져와야 함
-            gameFinishResDto.setLoserName("user2_nickname"); // user2 닉네임 가져와야 함
-            gameFinishResDto.setPointP1(userOnePoint);
-            gameFinishResDto.setPointP2(userTwoPoint);
-            gameFinishResDto.setDopamineP1(userOneDopamine);
-            gameFinishResDto.setDopamineP2(userTwoDopamine);
-
-            return gameFinishResDto;
-        }
-
-        // user2가 이긴 경우
         GameFinishResDto gameFinishResDto = new GameFinishResDto();
-        gameFinishResDto.setFinishType(FinishType.TIME_EXCEED);
-        gameFinishResDto.setWinner("user2");
-        gameFinishResDto.setWinnerName("user2_nickname");
-        gameFinishResDto.setLoserName("user1_nickname");
-        gameFinishResDto.setPointP1(userOnePoint);
-        gameFinishResDto.setPointP2(userTwoPoint);
-        gameFinishResDto.setDopamineP1(userOneDopamine);
-        gameFinishResDto.setDopamineP2(userTwoDopamine);
+        gameFinishResDto.setFinishType(finishType);
+        gameFinishResDto.setWinner(isUserOneWin ? "user1" : "user2");
+        // TODO : 유저 정보 넣기
+        gameFinishResDto.setUsersInfo(List.of(new GameFinishInfoForUser()));
 
+        // TODO : 포인트 소매넣기
+
+
+        // MySQL에 저장하기 -> Repository에 저장
+        // user1 GameInfoForUser에 저장
+        GameInfoForUser newGameInfoForUser1 = new GameInfoForUser();
+        newGameInfoForUser1.setUserId(userOneId);
+        newGameInfoForUser1.setDopamine(userOneDopamine);
+        newGameInfoForUser1.setPoint(userOnePoint);
+
+        // user2 GameInfoForUser에 저장
+        GameInfoForUser newGameInfoForUser2 = new GameInfoForUser();
+        newGameInfoForUser2.setUserId(userTwoId);
+        newGameInfoForUser2.setDopamine(userTwoDopamine);
+        newGameInfoForUser2.setPoint(userTwoPoint);
+
+        // user1Info와 user2Info를 담을 List 만들기
+        List<GameInfoForUser> newUsersInfo = new ArrayList<>();
+        newUsersInfo.add(newGameInfoForUser1);
+        newUsersInfo.add(newGameInfoForUser2);
+
+        // 배팅 포인트 가져오기
+        Long betPoint = (Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point");
+
+        GameInfo newGameInfo = new GameInfo();
+        newGameInfo.setRoomId(roomId);
+        newGameInfo.setBetPoint(betPoint);
+        newGameInfo.setUsersInfo(newUsersInfo);
+
+        // mysql에 데이터 저장하기
+        gameRepository.save(newGameInfo);
+
+        // redis에서 데이터 삭제하기
+        redisTemplate.delete("game_rooms:" + roomId);
+        redisTemplate.delete("point_boxes:" + roomId);
+        redisTemplate.delete("dopamine_boxes:" + roomId);
+        redisTemplate.delete("player_positions:" + roomId);
+        redisTemplate.delete("player_points:" + roomId);
+
+        // 결과값 반환하기
         return gameFinishResDto;
     }
 
