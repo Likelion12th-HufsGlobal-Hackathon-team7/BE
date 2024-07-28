@@ -34,6 +34,7 @@ public class GameRoomService {
     public RoomUpdateResDto updateRoom(String roomId, String userId, Long betPoint, Long timeLimit) {
         String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
         if (!userId.equals(userOneId)) {
+            // TODO : 유저들의 포인트가 미달된 경우에도 이 로직에 포함시키기
             RoomUpdateResDto roomUpdateResDto = new RoomUpdateResDto();
             roomUpdateResDto.setStatus(false);
             roomUpdateResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
@@ -71,11 +72,13 @@ public class GameRoomService {
     }
 
     public GameStartResDto startGame(String roomId) {
+        // TODO : 유저 포인트가 모자라면 컷
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "game_status", "game_started");
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "user_entered", 0);
 
         GameStartResDto gameStartResDto = new GameStartResDto();
         gameStartResDto.setRoomId(roomId);
+
         return gameStartResDto;
     }
 }
