@@ -13,5 +13,5 @@ public class RoomUpdateResDto {
     private final String type = "room_updated";
     private boolean status;
     private Long betPoint;
-    private Integer timeLimit;
+    private Long timeLimit;
 }

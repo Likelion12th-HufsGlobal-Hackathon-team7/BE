@@ -11,5 +11,5 @@ public class RoomJoinResDto {
     private String user1;
     private String user2;
     private Long betPoint;
-    private Integer timeLimit;
+    private Long timeLimit;
 }
