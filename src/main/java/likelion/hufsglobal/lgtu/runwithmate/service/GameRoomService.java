@@ -15,7 +15,7 @@ public class GameRoomService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private static final Long DEFAULT_BET_POINT = 1000L;
-    private static final Integer DEFAULT_TIME_LIMIT = 60;
+    private static final Long DEFAULT_TIME_LIMIT = 60L;
 
     public String createRoom(String userId) {
         // 방 ID 생성
@@ -31,13 +31,13 @@ public class GameRoomService {
         return roomId;
     }
 
-    public RoomUpdateResDto updateRoom(String roomId, String userId, Long betPoint, Integer timeLimit) {
+    public RoomUpdateResDto updateRoom(String roomId, String userId, Long betPoint, Long timeLimit) {
         String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
         if (!userId.equals(userOneId)) {
             RoomUpdateResDto roomUpdateResDto = new RoomUpdateResDto();
             roomUpdateResDto.setStatus(false);
             roomUpdateResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
-            roomUpdateResDto.setTimeLimit((Integer) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
+            roomUpdateResDto.setTimeLimit((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
             return roomUpdateResDto;
         }
 
@@ -64,12 +64,13 @@ public class GameRoomService {
         roomJoinResDto.setUser1(userOneName);
         roomJoinResDto.setUser2(userTwoName);
         roomJoinResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
-        roomJoinResDto.setTimeLimit((Integer) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
+        roomJoinResDto.setTimeLimit((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
         return roomJoinResDto;
     }
 
     public GameStartResDto startGame(String roomId) {
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "game_status", "game_started");
+        redisTemplate.opsForHash().put("game_rooms:" + roomId, "user_entered", 0);
 
         GameStartResDto gameStartResDto = new GameStartResDto();
         gameStartResDto.setRoomId(roomId);

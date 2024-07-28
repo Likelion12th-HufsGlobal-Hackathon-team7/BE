@@ -10,5 +10,5 @@ import lombok.NoArgsConstructor;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class RoomUpdateReqDto {
     private Long betPoint;
-    private Integer timeLimit;
+    private Long timeLimit;
 }
