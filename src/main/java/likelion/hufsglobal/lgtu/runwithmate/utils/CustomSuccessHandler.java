@@ -34,13 +34,24 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         String token = jwtUtil.createToken(userId, role, 60*60*60*10L); // 10시간
 
         response.addCookie(createCookie("Authorization", token));
-        response.sendRedirect("http://localhost:5173/main");
+
+//        Cookie cookie = createCookie("Authorization", token);
+//        response.setHeader("Set-Cookie", String.format("%s=%s; Max-Age=%d; Path=/; SameSite=None; Secure", cookie.getName(), cookie.getValue(), cookie.getMaxAge()));
+
+        // 사용자 localhost로 접속하면 localhost로 리다이렉트, 배포 상태면 배포 사이트로 리다이렉트
+        if (request.getServerName().equals("localhost")) {
+            response.sendRedirect("http://localhost:5173/");
+            return;
+        }
+        response.sendRedirect("https://runwithmate.klr.kr/main/");
     }
 
     private Cookie createCookie(String key, String value) {
         Cookie cookie = new Cookie(key, value);
         cookie.setMaxAge(60*60*60*10);
         cookie.setPath("/");
+        cookie.setDomain("klr.kr");
+        cookie.setSecure(true);
         cookie.setHttpOnly(true);
         return cookie;
     }

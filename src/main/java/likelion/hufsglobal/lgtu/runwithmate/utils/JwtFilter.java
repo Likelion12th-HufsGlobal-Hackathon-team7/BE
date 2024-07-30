@@ -54,6 +54,7 @@ public class JwtFilter extends OncePerRequestFilter{
             }
 
             String userId = jwtUtil.getUserId(token);
+            log.info("userId: {}", userId);
             String role = jwtUtil.getRole(token);
 
             OAuth2UserDTO userDTO = new OAuth2UserDTO();
