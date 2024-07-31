@@ -25,8 +25,6 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
     @Override
     public OAuth2User loadUser(OAuth2UserRequest oAuth2UserRequest) throws OAuth2AuthenticationException {
         OAuth2User oAuth2User = super.loadUser(oAuth2UserRequest);
-        log.info(oAuth2User.toString());
-        log.info(oAuth2User.getAttributes().toString());
 
         OAuth2Response oAuth2Response = new KakaoResponse(oAuth2User.getAttributes());
 

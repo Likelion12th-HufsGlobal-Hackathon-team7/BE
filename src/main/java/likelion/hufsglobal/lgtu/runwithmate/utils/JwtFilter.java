@@ -29,6 +29,19 @@ public class JwtFilter extends OncePerRequestFilter{
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain) throws ServletException, IOException {
+        String requestUri = request.getRequestURI();
+
+        if (requestUri.matches("^/login(?:/.*)?$")) {
+
+            filterChain.doFilter(request, response);
+            return;
+        }
+        if (requestUri.matches("^/oauth2(?:/.*)?$")) {
+
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             filterChain.doFilter(request, response);
@@ -54,7 +67,6 @@ public class JwtFilter extends OncePerRequestFilter{
             }
 
             String userId = jwtUtil.getUserId(token);
-            log.info("userId: {}", userId);
             String role = jwtUtil.getRole(token);
 
             OAuth2UserDTO userDTO = new OAuth2UserDTO();
