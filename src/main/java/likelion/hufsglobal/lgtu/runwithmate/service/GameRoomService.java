@@ -3,6 +3,8 @@ package likelion.hufsglobal.lgtu.runwithmate.service;
 import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.GameStartResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomJoinResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomUpdateResDto;
+import likelion.hufsglobal.lgtu.runwithmate.domain.user.User;
+import likelion.hufsglobal.lgtu.runwithmate.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,8 @@ public class GameRoomService {
     private static final Long DEFAULT_BET_POINT = 1000L;
     private static final Long DEFAULT_TIME_LIMIT = 60L;
 
+    private final UserRepository userRepository;
+
     public String createRoom(String userId) {
         // 방 ID 생성
         String roomId = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
@@ -29,6 +33,21 @@ public class GameRoomService {
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "game_status", "room_created");
 
         return roomId;
+    }
+
+    public RoomJoinResDto checkRoomStatus(String roomId) {
+        String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
+        String userTwoId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user2_id");
+
+        String userOneName = findUserName(userOneId); // 나중에 userOneId로 이름을 가져와야 함
+        String userTwoName = findUserName(userTwoId); // 나중에 userTwoId로 이름을 가져와야 함
+
+        RoomJoinResDto roomJoinResDto = new RoomJoinResDto();
+        roomJoinResDto.setUser1(userOneName);
+        roomJoinResDto.setUser2(userTwoName);
+        roomJoinResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
+        roomJoinResDto.setTimeLimit((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
+        return roomJoinResDto;
     }
 
     public RoomUpdateResDto updateRoom(String roomId, String userId, Long betPoint, Long timeLimit) {
@@ -56,19 +75,7 @@ public class GameRoomService {
 
     public RoomJoinResDto joinRoom(String roomId, String userId) {
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "user2_id", userId);
-        String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
-        String userTwoId = userId;
-
-        String userOneName = "유저1"; // 나중에 userOneId로 이름을 가져와야 함
-        String userTwoName = "유저2"; // 나중에 userTwoId로 이름을 가져와야 함
-
-
-        RoomJoinResDto roomJoinResDto = new RoomJoinResDto();
-        roomJoinResDto.setUser1(userOneName);
-        roomJoinResDto.setUser2(userTwoName);
-        roomJoinResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
-        roomJoinResDto.setTimeLimit((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
-        return roomJoinResDto;
+        return checkRoomStatus(roomId);
     }
 
     public GameStartResDto startGame(String roomId) {
@@ -80,5 +87,11 @@ public class GameRoomService {
         gameStartResDto.setRoomId(roomId);
 
         return gameStartResDto;
+    }
+
+    private String findUserName(String userId){
+        User selectedUser = userRepository.findByUserId(userId).orElse(null);
+        if (selectedUser == null) {return "-";}
+        return selectedUser.getNickname();
     }
 }

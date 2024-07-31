@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -18,17 +19,15 @@ public class GameController {
 
     @MessageMapping("/start_check/{roomId}")
     @SendTo("/room/{roomId}")
-    public StartCheckResDto checkStart(@DestinationVariable String roomId, UserPosition userPosition) {
-        // TODO: JWT에서 유저 이름 가져오기
-        String userId = "user1"; // 임시로 유저 이름 지정
+    public StartCheckResDto checkStart(@DestinationVariable String roomId, UserPosition userPosition, Authentication authentication) {
+        String userId = authentication.getName();
         return gameService.checkStart(roomId, userId, userPosition);
     }
 
     @MessageMapping("/update_position/{roomId}")
     @SendTo("/room/{roomId}")
-    public PositionUpdateResDto updatePosition(@DestinationVariable String roomId, UserPosition userPosition) {
-        // TODO: JWT에서 유저 이름 가져오기, 서비스 연동하기
-        String userId = "user1"; // 임시로 유저 이름 지정
+    public PositionUpdateResDto updatePosition(@DestinationVariable String roomId, UserPosition userPosition, Authentication authentication) {
+        String userId = authentication.getName();
         return gameService.updatePosition(roomId, userId, userPosition);
     }
 

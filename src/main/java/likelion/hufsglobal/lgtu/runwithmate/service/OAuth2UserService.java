@@ -29,7 +29,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
         OAuth2Response oAuth2Response = new KakaoResponse(oAuth2User.getAttributes());
 
         String userId = oAuth2Response.getProvider()+"_"+oAuth2Response.getProviderId();
-        User existUser = userRepository.findByUserId(userId);
+        User existUser = userRepository.findByUserId(userId).orElse(null);
 
         if (existUser == null) {
             User newUser = new User();

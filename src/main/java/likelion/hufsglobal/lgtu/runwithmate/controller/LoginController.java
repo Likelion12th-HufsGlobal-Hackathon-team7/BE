@@ -18,8 +18,7 @@ public class LoginController {
 
     @GetMapping("/myinfo")
     public MyInfoResDto getTokenAndUsername() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
+        CustomOAuth2User oAuth2User = JwtUtil.getOAuth2User();
         String userId = oAuth2User.getUserId();
         String role = oAuth2User.getAuthorities().stream().findFirst().get().getAuthority();
         String accessToken = jwtUtil.createToken(userId, role, 60*60*60*24*30L);

@@ -3,7 +3,10 @@ package likelion.hufsglobal.lgtu.runwithmate.utils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import likelion.hufsglobal.lgtu.runwithmate.domain.oauth2.CustomOAuth2User;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -44,5 +47,10 @@ public class JwtUtil {
                 .expiration(new Date(System.currentTimeMillis() + expiredMs))
                 .signWith(secretKey)
                 .compact();
+    }
+
+    public static CustomOAuth2User getOAuth2User(){
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return (CustomOAuth2User) authentication.getPrincipal();
     }
 }

@@ -6,13 +6,16 @@ import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomUpdateReqDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomUpdateResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.oauth2.CustomOAuth2User;
 import likelion.hufsglobal.lgtu.runwithmate.service.GameRoomService;
+import likelion.hufsglobal.lgtu.runwithmate.utils.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,32 +23,38 @@ import org.springframework.web.bind.annotation.PostMapping;
 import java.security.Principal;
 
 @Controller
+@Slf4j
 @RequiredArgsConstructor
 public class GameRoomController {
 
     private final GameRoomService gameRoomService;
 
     @PostMapping("/api/games/join")
-    public ResponseEntity<String> joinGameRoom(Authentication authentication) {
-        // authentication의 payload 영역에서 userId 가져옴
-        CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
+    public ResponseEntity<String> joinGameRoom() {
+        CustomOAuth2User oAuth2User = JwtUtil.getOAuth2User();
         String userId = oAuth2User.getUserId();
-        System.out.println("userId: " + userId);
         return ResponseEntity.ok(gameRoomService.createRoom(userId));
     }
 
     @MessageMapping("/update_room/{roomId}")
     @SendTo("/room/{roomId}")
-    public RoomUpdateResDto updateRoom(@DestinationVariable String roomId, RoomUpdateReqDto roomUpdateReqDto) {
-        String userId = "user1"; // 요청한 유저의 id를 받아와야 함
+    public RoomUpdateResDto updateRoom(@DestinationVariable String roomId, RoomUpdateReqDto roomUpdateReqDto, Authentication authentication) {
+        String userId = authentication.getName();
+        System.out.println("userId: " + userId);
+        log.info("userId: " + userId);
         return gameRoomService.updateRoom(roomId, userId, roomUpdateReqDto.getBetPoint(), roomUpdateReqDto.getTimeLimit());
+    }
+
+    @MessageMapping("/check_room/{roomId}")
+    @SendTo("/room/{roomId}")
+    public RoomJoinResDto checkRoom(@DestinationVariable String roomId) {
+        return gameRoomService.checkRoomStatus(roomId);
     }
 
     @MessageMapping("/join_room/{roomId}")
     @SendTo("/room/{roomId}")
-    public RoomJoinResDto joinRoom(@DestinationVariable String roomId) {
-
-        String userId = "user2"; // 임시로 유저 이름 지정
+    public RoomJoinResDto joinRoom(@DestinationVariable String roomId, Authentication authentication) {
+        String userId = authentication.getName();
         return gameRoomService.joinRoom(roomId, userId);
     }
 
