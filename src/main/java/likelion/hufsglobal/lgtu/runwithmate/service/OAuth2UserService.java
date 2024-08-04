@@ -37,6 +37,8 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
             newUser.setNickname(oAuth2Response.getNickname());
             newUser.setImage(oAuth2Response.getImage());
             newUser.setRole("ROLE_USER");
+            // 회원가입 시 포인트 0으로 설정
+            newUser.setPoint(0L);
             userRepository.save(newUser);
 
             OAuth2UserDTO userDTO = new OAuth2UserDTO();
