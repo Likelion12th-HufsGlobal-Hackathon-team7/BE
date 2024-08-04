@@ -31,7 +31,6 @@ public class GameService {
 
     @Transactional
     public StartCheckResDto checkStart(String roomId, String userId, UserPosition position) {
-        // TODO : Refactor -> 전원 입장시에만 유저에게 보내도록
         // 유저 체크 로직 -> 최초 0명 -> 2명 다 찼다면 게임 시작
         Long userCount = (Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user_entered");
         redisTemplate.opsForHash().increment("game_rooms:" + roomId, "user_entered", 1);
@@ -246,11 +245,11 @@ public class GameService {
         GameFinishResDto gameFinishResDto = new GameFinishResDto();
         gameFinishResDto.setFinishType(finishType);
         gameFinishResDto.setWinner(isUserOneWin ? userOneId : userTwoId);
-        // TODO : 유저 정보 넣기 -> [ 완 ]
-        User userOne = userRepository.findByUserId(userOneId);
+
+        User userOne = userRepository.findByUserId(userOneId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         String userOneName = userOne.getNickname();
 
-        User userTwo = userRepository.findByUserId(userTwoId);
+        User userTwo = userRepository.findByUserId(userTwoId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         String userTwoName = userTwo.getNickname();
 
         GameFinishInfoForUser userOneInfo = new GameFinishInfoForUser();
@@ -267,7 +266,6 @@ public class GameService {
 
         List<GameFinishInfoForUser> usersInfoList = List.of(userOneInfo, userTwoInfo);
         gameFinishResDto.setUsersInfo(usersInfoList);
-
 
         // MySQL에 저장하기 -> Repository에 저장
         // user1 GameInfoForUser에 저장
