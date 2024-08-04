@@ -6,11 +6,13 @@ import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomUpdateResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.user.User;
 import likelion.hufsglobal.lgtu.runwithmate.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameRoomService {
@@ -39,8 +41,10 @@ public class GameRoomService {
         String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
         String userTwoId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user2_id");
 
-        String userOneName = findUserName(userOneId); // 나중에 userOneId로 이름을 가져와야 함
-        String userTwoName = findUserName(userTwoId); // 나중에 userTwoId로 이름을 가져와야 함
+        log.info("userOneId : " + userOneId);
+        log.info("userTwoId : " + userTwoId);
+        String userOneName = findUserName(userOneId);
+        String userTwoName = findUserName(userTwoId);
 
         RoomJoinResDto roomJoinResDto = new RoomJoinResDto();
         roomJoinResDto.setUser1(userOneName);
@@ -52,8 +56,15 @@ public class GameRoomService {
 
     public RoomUpdateResDto updateRoom(String roomId, String userId, Long betPoint, Long timeLimit) {
         String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
-        if (!userId.equals(userOneId)) {
-            // TODO : 유저들의 포인트가 미달된 경우에도 이 로직에 포함시키기 -> user1만 입장된 상태랑 둘 다 입장된 상태로 나눠서 해야할까요..?
+        boolean isUpdateAvailable = !userId.equals(userOneId);
+
+        User userOne = userRepository.findByUserId(userOneId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User userTwo = userRepository.findByUserId(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (userOne.getPoint() < betPoint || userTwo.getPoint() < betPoint) {
+            isUpdateAvailable = false;
+        }
+
+        if (!isUpdateAvailable) {
             RoomUpdateResDto roomUpdateResDto = new RoomUpdateResDto();
             roomUpdateResDto.setStatus(false);
             roomUpdateResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
@@ -72,12 +83,15 @@ public class GameRoomService {
     }
 
     public RoomJoinResDto joinRoom(String roomId, String userId) {
-        redisTemplate.opsForHash().put("game_rooms:" + roomId, "user2_id", userId);
+        String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
+        String userTwoId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user2_id");
+        if ( !userId.equals(userOneId) && !userId.equals(userTwoId) ) {
+            redisTemplate.opsForHash().put("game_rooms:" + roomId, "user2_id", userId);
+        }
         return checkRoomStatus(roomId);
     }
 
     public GameStartResDto startGame(String roomId) {
-        // TODO : 유저 포인트가 모자라면 컷
         String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
         User userOne = userRepository.findByUserId(userOneId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         Long userOnePoint = userOne.getPoint();

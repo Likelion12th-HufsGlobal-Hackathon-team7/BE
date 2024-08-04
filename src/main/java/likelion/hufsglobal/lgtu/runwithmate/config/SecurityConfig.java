@@ -40,9 +40,9 @@ public class SecurityConfig {
                     CorsConfiguration configuration = new CorsConfiguration();
 
                     configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173","https://runwithmate.klr.kr"));
-                    configuration.setAllowedMethods(Collections.singletonList("*"));
+                    configuration.setAllowedMethods(Arrays.asList("POST", "GET", "OPTIONS", "DELETE"));
                     configuration.setAllowCredentials(true);
-                    configuration.setAllowedHeaders(Collections.singletonList("*"));
+                    configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Set-Cookie"));
                     configuration.setMaxAge(3600L);
 
                     configuration.setExposedHeaders(Collections.singletonList("Set-Cookie"));
