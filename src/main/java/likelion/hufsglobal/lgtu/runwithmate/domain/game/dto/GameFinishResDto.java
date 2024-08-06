@@ -15,7 +15,10 @@ import java.util.List;
 public class GameFinishResDto {
     private final String type = "game_finished";
     private FinishType finishType; // 두 개로 해야하는디 흠
-    private String winner;
+    private String roomId;
+    private Long betPoint;
+    private String winnerId;
+    private String winnerName;
     private List<GameFinishInfoForUser> usersInfo;
 
 }

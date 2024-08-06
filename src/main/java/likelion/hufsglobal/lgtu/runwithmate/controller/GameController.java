@@ -34,10 +34,10 @@ public class GameController {
     }
 
     @MessageMapping("/update_position/{roomId}")
-    @SendTo("/room/{roomId}")
-    public PositionUpdateResDto updatePosition(@DestinationVariable String roomId, UserPosition userPosition, Authentication authentication) {
+//    @SendTo("/room/{roomId}")
+    public void updatePosition(@DestinationVariable String roomId, UserPosition userPosition, Authentication authentication) {
         String userId = authentication.getName();
-        return gameService.updatePosition(roomId, userId, userPosition);
+        gameService.updatePosition(roomId, userId, userPosition);
     }
 
     @MessageMapping("/surrender/{roomId}")

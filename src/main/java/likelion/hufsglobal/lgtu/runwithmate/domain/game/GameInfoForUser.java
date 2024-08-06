@@ -19,6 +19,7 @@ public class GameInfoForUser {
     private Long id;
 
     private String userId;
+    private String userName;
     private Long dopamine;
     private Long point;
 }

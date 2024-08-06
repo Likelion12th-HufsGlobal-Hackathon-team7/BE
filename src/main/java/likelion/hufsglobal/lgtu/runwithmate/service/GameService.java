@@ -168,28 +168,26 @@ public class GameService {
     }
 
     private Long calcRunTime(String roomId){
+        ObjectMapper mapper = new ObjectMapper();
         Object startTimeObject = redisTemplate.opsForHash().get("game_rooms:" + roomId, "start_time");
 
-        if (startTimeObject instanceof String) {
-            // 저장된 문자열을 LocalDateTime으로 변환
-            LocalDateTime startTime = LocalDateTime.parse((String) startTimeObject, formatter);
-            LocalDateTime currentTime = LocalDateTime.now();
-            Duration duration = Duration.between(startTime, currentTime);
-            return duration.getSeconds();
-        } else {
-            throw new IllegalStateException("게임 시작 시간을 인식할 수 없습니다. String 타입이 아닙니다.");
-        }
+        LocalDateTime startTime = LocalDateTime.parse(mapper.convertValue(startTimeObject, String.class), formatter);
+        LocalDateTime currentTime = LocalDateTime.now();
+        Duration duration = Duration.between(startTime, currentTime);
+        return duration.getSeconds();
     }
 
     private Long calcTimeLeft(String roomId){
         Long runTime = calcRunTime(roomId);
-        Long timeLimit = Long.valueOf((Integer) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));;
-        return timeLimit - runTime;
+        ObjectMapper mapper = new ObjectMapper();
+
+        Object object = redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit");;
+        return mapper.convertValue(object, Long.class) - runTime;
     }
 
     // -------------------------------------------------
 
-    public PositionUpdateResDto updatePosition(String roomId, String userId, UserPosition position) {
+    public void updatePosition(String roomId, String userId, UserPosition position) {
         /**
          * 1. 해당 플레이어 위치를 `player_position:방번호`방번호 에서 찾음
          * 2. (선택) 현재 위치와 이전 위치의 오차를 계산하고, 비정상적인 변동인지 파악함
@@ -204,7 +202,11 @@ public class GameService {
         positionUpdateResDto.setPosition(position);
         positionUpdateResDto.setTimeLeft(calcTimeLeft(roomId));
 
-        return positionUpdateResDto;
+        messagingTemplate.convertAndSend("/room/" + roomId, positionUpdateResDto);
+        // 시간 종료 체크
+        if (calcTimeLeft(roomId) <= 0) {
+            messagingTemplate.convertAndSend("/room/" + roomId, finishGame(roomId, FinishType.TIME_OVER, ""));
+        }
     }
 
     // -------------------------------------------------
@@ -327,14 +329,18 @@ public class GameService {
         String userTwoId = (String) redisTemplate.opsForHash().get("game_rooms:"+roomId,"user2_id");
 
         // user1 인게임 도파민/포인트 빼오기
-        Map<String, Long> userOnePoints = (Map<String, Long>) redisTemplate.opsForHash().get("player_points:" + roomId, userOneId);
-        Long userOneDopamine = userOnePoints.get("dopamine");
-        Long userOneGamePoint = userOnePoints.get("point");
+        ObjectMapper mapper = new ObjectMapper();
+        Object object;
+        object = redisTemplate.opsForHash().get("player_points:" + roomId, userOneId);
+        Map<String, Integer> userOnePoints = mapper.convertValue(object, Map.class);
+        Long userOneDopamine = Long.valueOf((Integer)userOnePoints.get("dopamine"));
+        Long userOneGamePoint = Long.valueOf((Integer)userOnePoints.get("point"));
 
         // user2 인게임 도파민/포인트 빼오기
-        Map<String, Long> userTwoPoints = (Map<String, Long>) redisTemplate.opsForHash().get("player_points:" + roomId, userTwoId);
-        Long userTwoDopamine = userTwoPoints.get("dopamine");
-        Long userTwoGamePoint = userTwoPoints.get("point");
+        object = redisTemplate.opsForHash().get("player_points:" + roomId, userTwoId);
+        Map<String, Integer> userTwoPoints = mapper.convertValue(object, Map.class);
+        Long userTwoDopamine = Long.valueOf((Integer)userTwoPoints.get("dopamine"));
+        Long userTwoGamePoint = Long.valueOf((Integer)userTwoPoints.get("point"));
 
 
         boolean isUserOneWin = userOneDopamine >= userTwoDopamine;
@@ -342,9 +348,16 @@ public class GameService {
             isUserOneWin = !surrenderId.equals(userOneId);
         }
 
+        // --- Response DTO 만들기 ---
+
         GameFinishResDto gameFinishResDto = new GameFinishResDto();
         gameFinishResDto.setFinishType(finishType);
-        gameFinishResDto.setWinner(isUserOneWin ? userOneId : userTwoId);
+        gameFinishResDto.setRoomId(roomId);
+        gameFinishResDto.setBetPoint(Long.valueOf((Integer) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point")));
+
+        String winnerId = isUserOneWin ? userOneId : userTwoId;
+        gameFinishResDto.setWinnerId(isUserOneWin ? userOneId : userTwoId);
+        gameFinishResDto.setWinnerName(userRepository.findByUserId(winnerId).orElseThrow(() -> new IllegalArgumentException("User not found")).getNickname());
 
         User userOne = userRepository.findByUserId(userOneId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         String userOneName = userOne.getNickname();
@@ -371,12 +384,14 @@ public class GameService {
         // user1 GameInfoForUser에 저장
         GameInfoForUser newGameInfoForUser1 = new GameInfoForUser();
         newGameInfoForUser1.setUserId(userOneId);
+        newGameInfoForUser1.setUserName(userOneName);
         newGameInfoForUser1.setDopamine(userOneDopamine);
         newGameInfoForUser1.setPoint(userOneGamePoint);
 
         // user2 GameInfoForUser에 저장
         GameInfoForUser newGameInfoForUser2 = new GameInfoForUser();
         newGameInfoForUser2.setUserId(userTwoId);
+        newGameInfoForUser2.setUserName(userTwoName);
         newGameInfoForUser2.setDopamine(userTwoDopamine);
         newGameInfoForUser2.setPoint(userTwoGamePoint);
 
@@ -385,12 +400,13 @@ public class GameService {
         newUsersInfo.add(newGameInfoForUser1);
         newUsersInfo.add(newGameInfoForUser2);
 
-        // 배팅 포인트 가져오기
-        Long betPoint = (Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point");
-
+        Long betPoint = Long.valueOf((Integer) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
         GameInfo newGameInfo = new GameInfo();
+        newGameInfo.setFinishType(finishType);
         newGameInfo.setRoomId(roomId);
         newGameInfo.setBetPoint(betPoint);
+        newGameInfo.setWinnerId(winnerId);
+        newGameInfo.setWinnerName(userRepository.findByUserId(winnerId).orElseThrow(() -> new IllegalArgumentException("User not found")).getNickname());
         newGameInfo.setUsersInfo(newUsersInfo);
 
         // mysql에 데이터 저장하기

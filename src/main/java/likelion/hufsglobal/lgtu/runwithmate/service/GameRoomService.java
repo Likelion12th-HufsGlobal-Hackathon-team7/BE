@@ -19,8 +19,8 @@ import java.util.UUID;
 public class GameRoomService {
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private static final long DEFAULT_BET_POINT = 1000L;
-    private static final long DEFAULT_TIME_LIMIT = 60L;
+    private static final int DEFAULT_BET_POINT = 1000;
+    private static final int DEFAULT_TIME_LIMIT = 60;
 
     private final UserRepository userRepository;
 
