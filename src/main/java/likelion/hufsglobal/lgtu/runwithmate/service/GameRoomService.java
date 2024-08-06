@@ -59,8 +59,6 @@ public class GameRoomService {
         roomJoinResDto.setUser2(userTwoName);
         roomJoinResDto.setUser1Point(userOnePoint);
         roomJoinResDto.setUser2Point(userTwoPoint);
-        roomJoinResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
-        roomJoinResDto.setTimeLimit((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
         roomJoinResDto.setBetPoint(Long.valueOf((Integer)redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point")));
         roomJoinResDto.setTimeLimit(Long.valueOf((Integer)redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit")));
         return roomJoinResDto;
