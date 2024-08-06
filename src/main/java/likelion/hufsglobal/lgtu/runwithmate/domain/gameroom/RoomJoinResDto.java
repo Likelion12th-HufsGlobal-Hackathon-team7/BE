@@ -13,6 +13,8 @@ public class RoomJoinResDto {
     private final String type = "room_joined";
     private String user1;
     private String user2;
+    private Long user1Point;
+    private Long user2Point;
     private Long betPoint;
     private Long timeLimit;
 }
