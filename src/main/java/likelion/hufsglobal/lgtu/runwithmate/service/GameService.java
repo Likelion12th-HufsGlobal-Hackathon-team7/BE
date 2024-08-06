@@ -8,7 +8,9 @@ import likelion.hufsglobal.lgtu.runwithmate.domain.game.UserPosition;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.dto.*;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.type.BoxType;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.type.FinishType;
+import likelion.hufsglobal.lgtu.runwithmate.domain.user.CheckUpdateResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.user.User;
+import likelion.hufsglobal.lgtu.runwithmate.domain.user.type.statusType;
 import likelion.hufsglobal.lgtu.runwithmate.repository.GameRepository;
 import likelion.hufsglobal.lgtu.runwithmate.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,41 @@ public class GameService {
     private final UserRepository userRepository;
 
     private static final DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+    // 출석체크
+    public CheckUpdateResDto updateCheck(String userId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime userLastCheck = findUserLastCheck(userId);
+
+        if (userLastCheck == null) {
+            userLastCheck = now.minusDays(1);
+        }
+
+        CheckUpdateResDto checkUpdateResDto = new CheckUpdateResDto();
+
+        if (now.toLocalDate() == userLastCheck.toLocalDate()) {
+            checkUpdateResDto.setStatus(statusType.FAIL);
+            checkUpdateResDto.setMessage("이미 금일 출석체크가 완료되었습니다.");
+        }
+
+        User selectedUser = userRepository.findByUserId(userId).orElseThrow(() -> new IllegalArgumentException("user not found"));
+        Long userPoint = selectedUser.getPoint();
+        selectedUser.setPoint(userPoint + 500L);
+        selectedUser.setLastCheck(now);
+
+        checkUpdateResDto.setStatus(statusType.SUCCESS);
+        checkUpdateResDto.setMessage("성공적으로 출석체크되었습니다.");
+
+        return checkUpdateResDto;
+    }
+
+    public LocalDateTime findUserLastCheck(String userId) {
+        User selectedUser = userRepository.findByUserId(userId).orElse(null);
+        if (selectedUser == null) {
+            return null;
+        }
+        return selectedUser.getLastCheck();
+    }
 
     @Transactional
     public StartCheckResDto checkStart(String roomId, String userId, UserPosition position) {
@@ -104,7 +141,7 @@ public class GameService {
     private List<BoxInfo> addBoxes(BoxType type, int count, String roomId, Long size, UserPosition position) {
         List<BoxInfo> boxes = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            BoxInfo newBox = createBox(type, 0.003, 0.0002, size+i, position, 10L);
+            BoxInfo newBox = createBox(type, 0.003, 0.0002, size+i, position, 50L);
             redisTemplate.opsForSet().add(type.name().toLowerCase() + "_boxes:" + roomId, newBox);
             boxes.add(newBox);
         }
@@ -359,7 +396,6 @@ public class GameService {
         // mysql에 데이터 저장하기
         gameRepository.save(newGameInfo);
 
-        // TODO : 포인트 소매넣기 -> [ 완 ] ADD : 포인트 뺸 후 소매넣기
         // userOnePoint - user1 포인트 / userOneGamePoint - user1이 게임에서 얻은 포인트
         Long userOnePoint = userOne.getPoint();
         Long userTwoPoint = userTwo.getPoint();
