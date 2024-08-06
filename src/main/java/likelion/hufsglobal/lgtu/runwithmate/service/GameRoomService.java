@@ -18,8 +18,8 @@ import java.util.UUID;
 public class GameRoomService {
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private static final Long DEFAULT_BET_POINT = 1000L;
-    private static final Long DEFAULT_TIME_LIMIT = 60L;
+    private static final long DEFAULT_BET_POINT = 1000L;
+    private static final long DEFAULT_TIME_LIMIT = 60L;
 
     private final UserRepository userRepository;
 
@@ -106,7 +106,7 @@ public class GameRoomService {
             throw new IllegalArgumentException("Not enough bet point");
         }
 
-        redisTemplate.opsForHash().put("game_rooms:" + roomId, "game_status", "game_started");
+        redisTemplate.opsForHash().put("game_rooms:" + roomId, "game_status", "game_ready");
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "user_entered", 0);
 
         GameStartResDto gameStartResDto = new GameStartResDto();
@@ -118,5 +118,21 @@ public class GameRoomService {
         User selectedUser = userRepository.findByUserId(userId).orElse(null);
         if (selectedUser == null) {return "-";}
         return selectedUser.getNickname();
+    }
+
+    public void createRoomForTest(){
+
+        redisTemplate.delete("game_rooms:" + 111111);
+        redisTemplate.delete("point_boxes:" + 111111);
+        redisTemplate.delete("dopamine_boxes:" + 111111);
+        redisTemplate.delete("player_positions:" + 111111);
+        redisTemplate.delete("player_points:" + 111111);
+
+        redisTemplate.opsForHash().put("game_rooms:" + 111111, "game_status", "game_ready");
+        redisTemplate.opsForHash().put("game_rooms:" + 111111, "bet_point", DEFAULT_BET_POINT);
+        redisTemplate.opsForHash().put("game_rooms:" + 111111, "time_limit", DEFAULT_TIME_LIMIT);
+        redisTemplate.opsForHash().put("game_rooms:" + 111111, "user1_id", "kakao_3641722702");
+        redisTemplate.opsForHash().put("game_rooms:" + 111111, "user2_id", "kakao_3641686562");
+        redisTemplate.opsForHash().put("game_rooms:" + 111111,  "user_entered", 0);
     }
 }

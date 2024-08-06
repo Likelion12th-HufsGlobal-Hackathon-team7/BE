@@ -44,9 +44,7 @@ public class SecurityConfig {
                     configuration.setAllowCredentials(true);
                     configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Set-Cookie"));
                     configuration.setMaxAge(3600L);
-
-                    configuration.setExposedHeaders(Collections.singletonList("Set-Cookie"));
-                    configuration.setExposedHeaders(Collections.singletonList("Authorization"));
+                    configuration.setExposedHeaders(Arrays.asList("Set-Cookie", "Authorization"));
 
                     return configuration;
                 }))
@@ -64,7 +62,7 @@ public class SecurityConfig {
                         .successHandler(customSuccessHandler))
 
                 .authorizeHttpRequests( request -> request
-                        .requestMatchers("/", "/oauth2/**", "/login/**", "/connect").permitAll()
+                        .requestMatchers("/", "/oauth2/**", "/login/**", "/connect", "/api/games/test").permitAll()
                         .anyRequest().authenticated()
                 );
 

@@ -1,5 +1,6 @@
 package likelion.hufsglobal.lgtu.runwithmate.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.BoxInfo;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.GameInfo;
 import likelion.hufsglobal.lgtu.runwithmate.domain.game.GameInfoForUser;
@@ -11,6 +12,7 @@ import likelion.hufsglobal.lgtu.runwithmate.domain.user.User;
 import likelion.hufsglobal.lgtu.runwithmate.repository.GameRepository;
 import likelion.hufsglobal.lgtu.runwithmate.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -18,48 +20,83 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameService {
-    private static final double DISTANCE_THRESHOLD = 0.0001;
+    private static final double DISTANCE_THRESHOLD = 0.00102;
     private final RedisTemplate<String, Object> redisTemplate;
     private final SimpMessagingTemplate messagingTemplate;
     private final GameRepository gameRepository;
     private final UserRepository userRepository;
 
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
     @Transactional
     public StartCheckResDto checkStart(String roomId, String userId, UserPosition position) {
-        // 유저 체크 로직 -> 최초 0명 -> 2명 다 찼다면 게임 시작
-        Long userCount = (Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user_entered");
-        redisTemplate.opsForHash().increment("game_rooms:" + roomId, "user_entered", 1);
-
-        // 유저 포인트 초기화
-        Map<String, Long> userPoints = new HashMap<>();
-        userPoints.put("point",0L);
-        userPoints.put("dopamine",0L);
-        redisTemplate.opsForHash().put("player_points:" + roomId, userId, userPoints);
-        // 유저 위치 저장하기
-        redisTemplate.opsForHash().put("player_positions:" + roomId, userId, position);
-
-        // 해당 범위 내에서 박스는 도파민-7개, 포인트-5개로 설정
-        // 각각 point_boxes:방번호, score_boxes:방번호 집합(Set)에 저장
-        Long dopamineCount = redisTemplate.opsForSet().size(BoxType.DOPAMINE.name().toLowerCase() + "_boxes:" + roomId);
-        Long pointCount = redisTemplate.opsForSet().size(BoxType.POINT.name().toLowerCase() + "_boxes:" + roomId);
-        List<BoxInfo> dopamineBoxes = addBoxes(BoxType.DOPAMINE, 7, roomId, dopamineCount, position);
-        List<BoxInfo> pointBoxes = addBoxes(BoxType.POINT, 5, roomId, pointCount, position);
-
+        String gameStatus = redisTemplate.opsForHash().get("game_rooms:" + roomId, "game_status").toString();
         StartCheckResDto startCheckResDto = new StartCheckResDto();
         startCheckResDto.setStarted(false);
-        startCheckResDto.setDopamineBoxes(dopamineBoxes);
-        startCheckResDto.setPointBoxes(pointBoxes);
-        startCheckResDto.setTimeLeft((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
+        startCheckResDto.setBetPoint(Long.valueOf((Integer) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point")));
 
-        if (userCount == 2) {
-            redisTemplate.opsForHash().put("game_rooms:" + roomId, "start_time", LocalDateTime.now());
+        Map<String, String> userNicknames = new HashMap<>();
+        String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
+        String userTwoId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user2_id");
+        userNicknames.put(userOneId, userRepository.findByUserId(userOneId).orElseThrow(() -> new IllegalArgumentException("User not found")).getNickname());
+        userNicknames.put(userTwoId, userRepository.findByUserId(userTwoId).orElseThrow(() -> new IllegalArgumentException("User not found")).getNickname());
+        startCheckResDto.setUserNicknames(userNicknames);
+
+        List<BoxInfo> dopamineBoxes = new ArrayList<>();
+        List<BoxInfo> pointBoxes = new ArrayList<>();
+
+        if (gameStatus.equals("game_ready")) {
+            // 유저 체크 로직 -> 최초 0명 -> 2명 다 찼다면 게임 시작
+            Long userCount = redisTemplate.opsForHash().increment("game_rooms:" + roomId, "user_entered", 1);
+
+            // 유저 포인트 초기화
+            PlayerPoint userPoints = new PlayerPoint();
+            userPoints.setDopamine(0);
+            userPoints.setPoint(0);
+            redisTemplate.opsForHash().put("player_points:" + roomId, userId, userPoints);
+            redisTemplate.opsForHash().put("player_positions:" + roomId, userId, position);
+
+            // 해당 범위 내에서 박스는 도파민-7개, 포인트-5개로 설정
+            // 각각 point_boxes:방번호, score_boxes:방번호 집합(Set)에 저장
+            Long dopamineCount = redisTemplate.opsForSet().size(BoxType.DOPAMINE.name().toLowerCase() + "_boxes:" + roomId);
+            Long pointCount = redisTemplate.opsForSet().size(BoxType.POINT.name().toLowerCase() + "_boxes:" + roomId);
+            dopamineBoxes = addBoxes(BoxType.DOPAMINE, 7, roomId, dopamineCount, position);
+            pointBoxes = addBoxes(BoxType.POINT, 5, roomId, pointCount, position);
+
+            startCheckResDto.setTimeLeft(Long.valueOf((Integer) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit")));
+
+            if (userCount == 2) {
+                String startTimeString = LocalDateTime.now().format(formatter);
+                redisTemplate.opsForHash().put("game_rooms:" + roomId, "game_status", "game_started");
+                redisTemplate.opsForHash().put("game_rooms:" + roomId, "start_time", startTimeString);
+                startCheckResDto.setStarted(true);
+            }
+        } else {
+            Set<Object> dopamineBoxesObj = redisTemplate.opsForSet().members(BoxType.DOPAMINE.name().toLowerCase() + "_boxes:" + roomId);
+            Set<Object> pointBoxesObj = redisTemplate.opsForSet().members(BoxType.POINT.name().toLowerCase() + "_boxes:" + roomId);
+            for (Object obj : dopamineBoxesObj) {
+                ObjectMapper mapper = new ObjectMapper();
+                BoxInfo box = mapper.convertValue(obj, BoxInfo.class);
+                dopamineBoxes.add(box);
+            }
+            for (Object obj : pointBoxesObj) {
+                ObjectMapper mapper = new ObjectMapper();
+                BoxInfo box = mapper.convertValue(obj, BoxInfo.class);
+                pointBoxes.add(box);
+            }
+            startCheckResDto.setTimeLeft(calcTimeLeft(roomId));
             startCheckResDto.setStarted(true);
         }
+
+        startCheckResDto.setDopamineBoxes(dopamineBoxes);
+        startCheckResDto.setPointBoxes(pointBoxes);
 
         return startCheckResDto;
     }
@@ -94,15 +131,22 @@ public class GameService {
     }
 
     private Long calcRunTime(String roomId){
-        LocalDateTime startTime = (LocalDateTime) redisTemplate.opsForHash().get("game_rooms:" + roomId, "start_time");
-        LocalDateTime currentTime = LocalDateTime.now();
-        Duration duration = Duration.between(startTime, currentTime);
-        return duration.getSeconds();
+        Object startTimeObject = redisTemplate.opsForHash().get("game_rooms:" + roomId, "start_time");
+
+        if (startTimeObject instanceof String) {
+            // 저장된 문자열을 LocalDateTime으로 변환
+            LocalDateTime startTime = LocalDateTime.parse((String) startTimeObject, formatter);
+            LocalDateTime currentTime = LocalDateTime.now();
+            Duration duration = Duration.between(startTime, currentTime);
+            return duration.getSeconds();
+        } else {
+            throw new IllegalStateException("게임 시작 시간을 인식할 수 없습니다. String 타입이 아닙니다.");
+        }
     }
 
     private Long calcTimeLeft(String roomId){
         Long runTime = calcRunTime(roomId);
-        Long timeLimit = (Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit");;
+        Long timeLimit = Long.valueOf((Integer) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));;
         return timeLimit - runTime;
     }
 
@@ -117,6 +161,7 @@ public class GameService {
         // 플레이어의 위치 변경
         redisTemplate.opsForHash().put("player_positions:" + roomId, userId, position);
 
+        removeBox(roomId, userId, position);
         PositionUpdateResDto positionUpdateResDto = new PositionUpdateResDto();
         positionUpdateResDto.setUserId(userId);
         positionUpdateResDto.setPosition(position);
@@ -137,8 +182,6 @@ public class GameService {
          * 4. 제거된 박스 프론트한테 공지
          */
 
-        BoxRemoveResDto response = new BoxRemoveResDto();
-
         // 1. 특정 박스 주변인지 파악
         List<BoxInfo> nearbyBoxes = findNearbyBoxes(roomId, position);
         if (nearbyBoxes.isEmpty()) {
@@ -152,18 +195,20 @@ public class GameService {
 
     private List<BoxInfo> findNearbyBoxes(String roomId, UserPosition position) {
         List<BoxInfo> nearbyBoxes = new ArrayList<>();
-        List<Object> pointBoxes = redisTemplate.opsForList().range("point_boxes:" + roomId, 0, -1);
-        List<Object> dopamineBoxes = redisTemplate.opsForList().range("dopamine_boxes:" + roomId, 0, -1);
+        Set<Object> pointBoxes = redisTemplate.opsForSet().members("point_boxes:" + roomId);
+        Set<Object> dopamineBoxes = redisTemplate.opsForSet().members("dopamine_boxes:" + roomId);
 
         for (Object obj : pointBoxes) {
-            BoxInfo box = (BoxInfo) obj;
+            ObjectMapper mapper = new ObjectMapper();
+            BoxInfo box = mapper.convertValue(obj, BoxInfo.class);
             if (isNearby(box, position)) {
                 nearbyBoxes.add(box);
             }
         }
 
         for (Object obj : dopamineBoxes) {
-            BoxInfo box = (BoxInfo) obj;
+            ObjectMapper mapper = new ObjectMapper();
+            BoxInfo box = mapper.convertValue(obj, BoxInfo.class);
             if (isNearby(box, position)) {
                 nearbyBoxes.add(box);
             }
@@ -180,27 +225,31 @@ public class GameService {
     private void removeBoxes(String roomId, List<BoxInfo> boxes) {
         for (BoxInfo box : boxes) {
             if (box.getBoxType() == BoxType.POINT) {
-                redisTemplate.opsForList().remove("point_boxes:" + roomId, 1, box);
+                redisTemplate.opsForSet().remove("point_boxes:" + roomId, box);
             } else if (box.getBoxType() == BoxType.DOPAMINE) {
-                redisTemplate.opsForList().remove("dopamine_boxes:" + roomId, 1, box);
+                redisTemplate.opsForSet().remove("dopamine_boxes:" + roomId, box);
             }
         }
     }
 
     private void incrementPlayerPoints(String roomId, String userId, List<BoxInfo> boxes) {
-        String playerPointsKey = "player_points:" + roomId;
         for (BoxInfo box : boxes) {
+            Object object = redisTemplate.opsForHash().get("player_points:" + roomId, userId);
+            ObjectMapper mapper = new ObjectMapper();
+            PlayerPoint userPoints = mapper.convertValue(object, PlayerPoint.class);
             if (box.getBoxType() == BoxType.POINT) {
-                redisTemplate.opsForHash().increment(playerPointsKey, userId, box.getBoxAmount());
+//                redisTemplate.opsForHash().increment("player_points:" + roomId, userId, (int)(long) box.getBoxAmount());
+                userPoints.setPoint(userPoints.getPoint() + (int)(long) box.getBoxAmount());
             } else if (box.getBoxType() == BoxType.DOPAMINE) {
-                redisTemplate.opsForHash().increment(playerPointsKey, userId, box.getBoxAmount());
+//                redisTemplate.opsForHash().increment("player_points:" + roomId, userId, (int)(long) box.getBoxAmount());
+                userPoints.setDopamine(userPoints.getDopamine() + (int)(long) box.getBoxAmount());
             }
+            redisTemplate.opsForHash().put("player_points:" + roomId, userId, userPoints);
         }
     }
 
     private void notifyBoxRemoval(String roomId, String userId, List<BoxInfo> boxes) {
         for (BoxInfo box : boxes) {
-            // 박스 제거를 공지하는 로직을 여기에 추가 (예: 메시지 큐, 웹소켓 등)
             BoxRemoveResDto boxRemoveResDto = new BoxRemoveResDto();
             boxRemoveResDto.setBoxType(box.getBoxType());
             boxRemoveResDto.setBoxId(box.getId());
@@ -209,6 +258,20 @@ public class GameService {
 
             messagingTemplate.convertAndSend("/room/" + roomId, boxRemoveResDto);
         }
+
+        // 모든 유저의 포인트 반환하기
+        PlayerPointsResDto playerPointsResDto = new PlayerPointsResDto();
+        Map<String, PlayerPoint> playerPoints = new HashMap<>();
+        Set<Object> userIds = redisTemplate.opsForHash().keys("player_points:" + roomId);
+        for (Object obj : userIds) {
+            String user = (String) obj;
+            Object object = redisTemplate.opsForHash().get("player_points:" + roomId, user);
+            ObjectMapper mapper = new ObjectMapper();
+            PlayerPoint userPoints = mapper.convertValue(object, PlayerPoint.class);
+            playerPoints.put(user, userPoints);
+        }
+        playerPointsResDto.setPlayerPoints(playerPoints);
+        messagingTemplate.convertAndSend("/room/" + roomId, playerPointsResDto);
     }
 
     // -------------------------------------------------

@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
@@ -71,5 +72,11 @@ public class GameRoomController {
     public String send(String message, Principal principal) throws Exception {
         String userId = principal.getName();
         return "User " + userId + " sent: " + message;
+    }
+
+    @PostMapping("/api/games/test")
+    public ResponseEntity<Void> test() {
+        gameRoomService.createRoomForTest();
+        return ResponseEntity.ok().build();
     }
 }
