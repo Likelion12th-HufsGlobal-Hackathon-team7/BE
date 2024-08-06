@@ -59,8 +59,8 @@ public class GameRoomService {
         RoomJoinResDto roomJoinResDto = new RoomJoinResDto();
         roomJoinResDto.setUser1(userOneName);
         roomJoinResDto.setUser2(userTwoName);
-        roomJoinResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
-        roomJoinResDto.setTimeLimit((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
+        roomJoinResDto.setBetPoint(Long.valueOf((Integer)redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point")));
+        roomJoinResDto.setTimeLimit(Long.valueOf((Integer)redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit")));
         return roomJoinResDto;
     }
 
@@ -77,8 +77,8 @@ public class GameRoomService {
         if (!isUpdateAvailable) {
             RoomUpdateResDto roomUpdateResDto = new RoomUpdateResDto();
             roomUpdateResDto.setStatus(false);
-            roomUpdateResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
-            roomUpdateResDto.setTimeLimit((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
+            roomUpdateResDto.setBetPoint(Long.valueOf((Integer)redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point")));
+            roomUpdateResDto.setTimeLimit(Long.valueOf((Integer)redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit")));
             return roomUpdateResDto;
         }
 
@@ -110,7 +110,7 @@ public class GameRoomService {
         User userTwo = userRepository.findByUserId(userTwoId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         Long userTwoPoint = userTwo.getPoint();
 
-        Long betPoint = (Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point");
+        Long betPoint = Long.valueOf((Integer)redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
 
         if (userOnePoint < betPoint || userTwoPoint < betPoint) {
             throw new IllegalArgumentException("Not enough bet point");
