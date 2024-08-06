@@ -25,7 +25,7 @@ public class GameRoomController {
     private final GameRoomService gameRoomService;
 
     @PostMapping("/api/games/join")
-    public ResponseEntity<RoomCreateResDto> joinGameRoom() {
+    public ResponseEntity<String> joinGameRoom() {
         CustomOAuth2User oAuth2User = JwtUtil.getOAuth2User();
         String userId = oAuth2User.getUserId();
         return ResponseEntity.ok(gameRoomService.createRoom(userId));

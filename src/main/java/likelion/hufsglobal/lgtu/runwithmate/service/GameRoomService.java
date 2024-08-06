@@ -24,7 +24,7 @@ public class GameRoomService {
 
     private final UserRepository userRepository;
 
-    public RoomCreateResDto createRoom(String userId) {
+    public String createRoom(String userId) {
         // 방 ID 생성
         String roomId = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         while (Boolean.TRUE.equals(redisTemplate.hasKey("game_rooms:" + roomId))) {
@@ -35,16 +35,7 @@ public class GameRoomService {
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "user1_id", userId);
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "game_status", "room_created");
 
-        // 유저 포인트
-        User selectedUser = userRepository.findByUserId(userId).orElseThrow(() -> new IllegalArgumentException("user not found"));
-        Long userPoint = selectedUser.getPoint();
-
-        // roomId, userPoint 프론트로 전달
-        RoomCreateResDto roomCreateResDto = new RoomCreateResDto();
-        roomCreateResDto.setRoomId(roomId);
-        roomCreateResDto.setUserPoint(userPoint);
-
-        return roomCreateResDto;
+        return roomId;
     }
 
     public RoomJoinResDto checkRoomStatus(String roomId) {
@@ -56,9 +47,18 @@ public class GameRoomService {
         String userOneName = findUserName(userOneId);
         String userTwoName = findUserName(userTwoId);
 
+        // 유저 포인트
+        User userOne = userRepository.findByUserId(userOneId).orElse(null);
+        Long userOnePoint = userOne != null ? userOne.getPoint() : 0;
+
+        User userTwo = userRepository.findByUserId(userTwoId).orElse(null);
+        Long userTwoPoint = userTwo != null ? userTwo.getPoint() : 0;
+
         RoomJoinResDto roomJoinResDto = new RoomJoinResDto();
         roomJoinResDto.setUser1(userOneName);
         roomJoinResDto.setUser2(userTwoName);
+        roomJoinResDto.setUser1Point(userOnePoint);
+        roomJoinResDto.setUser2Point(userTwoPoint);
         roomJoinResDto.setBetPoint((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "bet_point"));
         roomJoinResDto.setTimeLimit((Long) redisTemplate.opsForHash().get("game_rooms:" + roomId, "time_limit"));
         return roomJoinResDto;
