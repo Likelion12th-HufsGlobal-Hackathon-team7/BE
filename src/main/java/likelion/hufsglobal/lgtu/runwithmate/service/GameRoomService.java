@@ -42,8 +42,8 @@ public class GameRoomService {
         String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
         String userTwoId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user2_id");
 
-        log.info("userOneId : " + userOneId);
-        log.info("userTwoId : " + userTwoId);
+        log.info("[방 상태 반환] userOneId : " + userOneId);
+        log.info("[방 상태 반환] userTwoId : " + userTwoId);
         String userOneName = findUserName(userOneId);
         String userTwoName = findUserName(userTwoId);
 
@@ -66,7 +66,7 @@ public class GameRoomService {
 
     public RoomUpdateResDto updateRoom(String roomId, String userId, Long betPoint, Long timeLimit) {
         String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
-        boolean isUpdateAvailable = !userId.equals(userOneId);
+        boolean isUpdateAvailable = userId.equals(userOneId);
 
         User userOne = userRepository.findByUserId(userOneId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         User userTwo = userRepository.findByUserId(userId).orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -102,11 +102,14 @@ public class GameRoomService {
     }
 
     public GameStartResDto startGame(String roomId) {
+        log.info("[게임 시작] roomId : " + roomId);
         String userOneId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user1_id");
+        log.info("[게임 시작] userOneId : " + userOneId);
         User userOne = userRepository.findByUserId(userOneId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         Long userOnePoint = userOne.getPoint();
 
         String userTwoId = (String) redisTemplate.opsForHash().get("game_rooms:" + roomId, "user2_id");
+        log.info("[게임 시작] userTwoId : " + userTwoId);
         User userTwo = userRepository.findByUserId(userTwoId).orElseThrow(() -> new IllegalArgumentException("User not found"));
         Long userTwoPoint = userTwo.getPoint();
 

@@ -56,7 +56,7 @@ public class GameRoomController {
 
     @MessageMapping("/start_game/{roomId}")
     @SendTo("/room/{roomId}")
-    public GameStartResDto startGame(@PathVariable String roomId) {
+    public GameStartResDto startGame(@DestinationVariable String roomId) {
         // 박스 위치 정보는 GameController에서 모든 플레이어들이 게임 시작 요청하면, 위치정보를 받으면서 랜덤으로 박스 위치를 생성하여 전달
         return gameRoomService.startGame(roomId);
     }
