@@ -1,6 +1,7 @@
 package likelion.hufsglobal.lgtu.runwithmate.service;
 
 import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.GameStartResDto;
+import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomCreateResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomJoinResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomUpdateResDto;
 import likelion.hufsglobal.lgtu.runwithmate.domain.user.User;
@@ -23,7 +24,7 @@ public class GameRoomService {
 
     private final UserRepository userRepository;
 
-    public String createRoom(String userId) {
+    public RoomCreateResDto createRoom(String userId) {
         // 방 ID 생성
         String roomId = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         while (Boolean.TRUE.equals(redisTemplate.hasKey("game_rooms:" + roomId))) {
@@ -34,7 +35,16 @@ public class GameRoomService {
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "user1_id", userId);
         redisTemplate.opsForHash().put("game_rooms:" + roomId, "game_status", "room_created");
 
-        return roomId;
+        // 유저 포인트
+        User selectedUser = userRepository.findByUserId(userId).orElseThrow(() -> new IllegalArgumentException("user not found"));
+        Long userPoint = selectedUser.getPoint();
+
+        // roomId, userPoint 프론트로 전달
+        RoomCreateResDto roomCreateResDto = new RoomCreateResDto();
+        roomCreateResDto.setRoomId(roomId);
+        roomCreateResDto.setUserPoint(userPoint);
+
+        return roomCreateResDto;
     }
 
     public RoomJoinResDto checkRoomStatus(String roomId) {

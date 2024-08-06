@@ -1,21 +1,16 @@
 package likelion.hufsglobal.lgtu.runwithmate.controller;
 
-import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.GameStartResDto;
-import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomJoinResDto;
-import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomUpdateReqDto;
-import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.RoomUpdateResDto;
+import likelion.hufsglobal.lgtu.runwithmate.domain.gameroom.*;
 import likelion.hufsglobal.lgtu.runwithmate.domain.oauth2.CustomOAuth2User;
 import likelion.hufsglobal.lgtu.runwithmate.service.GameRoomService;
 import likelion.hufsglobal.lgtu.runwithmate.utils.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,7 +25,7 @@ public class GameRoomController {
     private final GameRoomService gameRoomService;
 
     @PostMapping("/api/games/join")
-    public ResponseEntity<String> joinGameRoom() {
+    public ResponseEntity<RoomCreateResDto> joinGameRoom() {
         CustomOAuth2User oAuth2User = JwtUtil.getOAuth2User();
         String userId = oAuth2User.getUserId();
         return ResponseEntity.ok(gameRoomService.createRoom(userId));
