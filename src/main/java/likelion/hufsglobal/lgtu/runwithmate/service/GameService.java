@@ -424,6 +424,9 @@ public class GameService {
             userTwo.setPoint(userTwoPoint + betPoint + userTwoGamePoint);
         }
 
+        userRepository.save(userOne);
+        userRepository.save(userTwo);
+
         // redis에서 데이터 삭제하기
         redisTemplate.delete("game_rooms:" + roomId);
         redisTemplate.delete("point_boxes:" + roomId);
