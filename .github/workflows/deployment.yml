@@ -1,0 +1,70 @@
+name: Deploy Spring Boot App to k3s
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Add Yml Files
+        run: |
+          echo "${{ secrets.APPLICATION }}" | while IFS= read -r line; do
+            echo "$line" >> ${PWD}/src/main/resources/application.yml
+          done
+          echo "${{ secrets.APPLICATION_JWT }}" | while IFS= read -r line; do
+            echo "$line" >> ${PWD}/src/main/resources/application-jwt.yml
+          done
+          echo "${{ secrets.APPLICATION_MYSQL }}" | while IFS= read -r line; do
+            echo "$line" >> ${PWD}/src/main/resources/application-mysql.yml
+          done
+          echo "${{ secrets.APPLICATION_OAUTH_KAKAO }}" | while IFS= read -r line; do
+            echo "$line" >> ${PWD}/src/main/resources/application-oauth-kakao.yml
+          done
+          echo "${{ secrets.APPLICATION_REDIS }}" | while IFS= read -r line; do
+            echo "$line" >> ${PWD}/src/main/resources/application-redis.yml
+          done
+          ls -al ${PWD}/src/main/resources
+
+      - name: Build the Spring Boot app
+        run: |
+          ./gradlew clean build
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_REGISTRY }}/lgtu_back:latest .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKER_REGISTRY }}/lgtu_back:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Set up KUBECONFIG
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Rollout restart the deployment
+        run: |
+          kubectl rollout restart deployments/lgtu-back
